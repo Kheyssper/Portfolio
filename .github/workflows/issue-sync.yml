@@ -1,3 +1,6 @@
+O erro "Unknown JSON field: 'dueOn'" indica que o campo `dueOn` não é reconhecido pela API do GitHub. O campo correto para a data de vencimento de uma issue é `due_date`. Vamos corrigir o arquivo `.github/workflows/issue-sync.yml`:
+
+```yaml
 name: Issue Milestone Synchronization
 
 on:
@@ -66,7 +69,7 @@ jobs:
           milestone_title=$(echo "$milestone" | jq -r '.title')
           milestone_due_on=$(echo "$milestone" | jq -r '.due_on')
           
-          issues=$(gh issue list --milestone "$milestone_title" --json dueOn,title)
+          issues=$(gh issue list --milestone "$milestone_title" --json due_date,title)
 
           if [ -z "$issues" ]; then
             echo "No issues found for milestone $milestone_title"
@@ -74,7 +77,7 @@ jobs:
           fi
           
           echo "$issues" | jq -c '.[]' | while read -r issue; do
-            issue_due_on=$(echo "$issue" | jq -r '.dueOn')
+            issue_due_on=$(echo "$issue" | jq -r '.due_date')
             issue_title=$(echo "$issue" | jq -r '.title')
             
             if [ "$issue_due_on" != "$milestone_due_on" ]; then
@@ -82,3 +85,6 @@ jobs:
             fi
           done
         done
+```
+
+Substitua `dueOn` por `due_date` no comando `jq` para corrigir o erro.
