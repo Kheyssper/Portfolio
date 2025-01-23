@@ -1,0 +1,59 @@
+name: Issue Milestone Synchronization
+
+on:
+  issues:
+    types: [opened, edited, milestoned, demilestoned]
+
+jobs:
+  sync-milestones:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Sync Child Issue Milestones
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # Busca todas as issues com relacionamentos pai/filho
+        parent_issues=$(gh issue list --json number,milestone,parentIssues)
+        
+        for issue in $(echo "$parent_issues" | jq -c '.[]'); do
+          parent_number=$(echo "$issue" | jq '.number')
+          parent_milestone=$(echo "$issue" | jq '.milestone.number')
+          
+          # Se o milestone do pai estiver definido
+          if [ ! -z "$parent_milestone" ] && [ "$parent_milestone" != "null" ]; then
+            # Sincroniza milestones dos filhos
+            child_issues=$(echo "$issue" | jq '.parentIssues[]?.number')
+            
+            for child_number in $child_issues; do
+              gh issue edit "$child_number" --milestone "$parent_milestone"
+            done
+          fi
+        done
+
+    - name: Validate Milestone Alignment
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        milestones=$(gh api -H "Accept: application/vnd.github+json" /repos/${{ github.repository }}/milestones)
+        
+        echo "$milestones" | jq -c '.[]' | while read -r milestone; do
+          milestone_title=$(echo "$milestone" | jq -r '.title')
+          milestone_due_on=$(echo "$milestone" | jq -r '.due_on')
+          
+          issues=$(gh issue list --milestone "$milestone_title" --json dueOn,title)
+          
+          echo "$issues" | jq -c '.[]' | while read -r issue; do
+            issue_due_on=$(echo "$issue" | jq -r '.dueOn')
+            issue_title=$(echo "$issue" | jq -r '.title')
+            
+            if [ "$issue_due_on" != "$milestone_due_on" ]; then
+              echo "AVISO: Issue '$issue_title' tem data diferente do milestone '$milestone_title'"
+            fi
+          done
+        done
