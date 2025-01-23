@@ -18,7 +18,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        # Busca todas as issues com relacionamentos pai/filho
+        set -e
         parent_issues=$(gh issue list --label epic --json number,milestone)
 
         for issue in $(echo "$parent_issues" | jq -c '.[]'); do
@@ -27,13 +27,14 @@ jobs:
           parent_start_date=$(echo "$issue" | jq -r '.milestone.start_at')
           parent_due_date=$(echo "$issue" | jq -r '.milestone.due_on')
 
-          # Se o milestone do pai estiver definido
+          echo "Parent Issue: $parent_number, Milestone: $parent_milestone"
+
           if [ ! -z "$parent_milestone" ] && [ "$parent_milestone" != "null" ]; then
-            # Sincroniza milestones dos filhos
             child_issues=$(gh issue list --label child-issue --json number)
 
             for child in $(echo "$child_issues" | jq -c '.[]'); do
               child_number=$(echo "$child" | jq '.number')
+              echo "Child Issue: $child_number"
               gh issue edit "$child_number" --milestone "$parent_milestone"
             done
           fi
@@ -43,6 +44,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
+        set -e
         milestones=$(gh api -H "Accept: application/vnd.github+json" /repos/${{ github.repository }}/milestones)
         
         echo "$milestones" | jq -c '.[]' | while read -r milestone; do
