@@ -21,7 +21,12 @@ jobs:
         set -e
         parent_issues=$(gh issue list --label epic --json number,milestone)
 
-        for issue in $(echo "$parent_issues" | jq -c '.[]'); do
+        if [ -z "$parent_issues" ]; then
+          echo "No parent issues found"
+          exit 0
+        fi
+
+        echo "$parent_issues" | jq -c '.[]' | while read -r issue; do
           parent_number=$(echo "$issue" | jq '.number')
           parent_milestone=$(echo "$issue" | jq '.milestone.number')
           parent_start_date=$(echo "$issue" | jq -r '.milestone.start_at')
@@ -32,7 +37,12 @@ jobs:
           if [ ! -z "$parent_milestone" ] && [ "$parent_milestone" != "null" ]; then
             child_issues=$(gh issue list --label child-issue --json number)
 
-            for child in $(echo "$child_issues" | jq -c '.[]'); do
+            if [ -z "$child_issues" ]; then
+              echo "No child issues found for parent issue $parent_number"
+              continue
+            fi
+
+            echo "$child_issues" | jq -c '.[]' | while read -r child; do
               child_number=$(echo "$child" | jq '.number')
               echo "Child Issue: $child_number"
               gh issue edit "$child_number" --milestone "$parent_milestone"
@@ -47,11 +57,21 @@ jobs:
         set -e
         milestones=$(gh api -H "Accept: application/vnd.github+json" /repos/${{ github.repository }}/milestones)
         
+        if [ -z "$milestones" ]; then
+          echo "No milestones found"
+          exit 0
+        fi
+
         echo "$milestones" | jq -c '.[]' | while read -r milestone; do
           milestone_title=$(echo "$milestone" | jq -r '.title')
           milestone_due_on=$(echo "$milestone" | jq -r '.due_on')
           
           issues=$(gh issue list --milestone "$milestone_title" --json dueOn,title)
+
+          if [ -z "$issues" ]; then
+            echo "No issues found for milestone $milestone_title"
+            continue
+          fi
           
           echo "$issues" | jq -c '.[]' | while read -r issue; do
             issue_due_on=$(echo "$issue" | jq -r '.dueOn')
